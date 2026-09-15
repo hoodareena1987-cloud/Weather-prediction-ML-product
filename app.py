@@ -6,7 +6,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error  
 from datetime import datetime, timedelta
 
-# 1. Page Configuration - Updated Title to explicitly highlight Weather Prediction
+# 1. Page Configuration - Title explicitly highlights Weather Prediction
 st.set_page_config(page_title="Agri-Smart AI Weather Prediction Engine", layout="centered")
 st.title("🌾 Agri-Smart AI: Precision Weather Prediction & Farming Advisor")
 st.write("An advanced machine learning framework providing crop risk management and climate insights for farmers.")
@@ -114,13 +114,15 @@ if st.button("Generate Agricultural AI Risk Assessment", type="primary"):
             }])
             
             predicted_max_array = model.predict(prediction_input)
-            predicted_max = float(predicted_max_array)
+            
+            # FIXED HERE: Added [0] index to cleanly unpack the numerical value from the array layout
+            predicted_max = float(predicted_max_array[0])
             
             # 5. Display Main Prediction Layout Dashboard Panels
             st.subheader(f"🔮 24-Hour Agronomy Forecast: {selected_city}")
             
             # --- SAFE AI ACCURACY COMPLIANCE GATE ---
-            SAFE_ACCURACY_LIMIT = 2.50  # Weather models must sit under a ±2.5°C error variance threshold to be operationally viable
+            SAFE_ACCURACY_LIMIT = 2.50  # Operational safety threshold limit
             
             if mae_score <= SAFE_ACCURACY_LIMIT:
                 st.success(f"⚙️ **AI Validation Status: SECURE**  \nRecent error score variance is **±{mae_score:.2f} °C**, sitting safely within the industry standard accuracy limit of **±{SAFE_ACCURACY_LIMIT:.2f} °C**. This prediction is highly dependable for farm planning.")
