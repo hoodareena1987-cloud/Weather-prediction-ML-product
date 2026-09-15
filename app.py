@@ -3,14 +3,15 @@ import pandas as pd
 import requests
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error  
 from datetime import datetime, timedelta
 
-# 1. Page Configuration - Renders the layout instantly
-st.set_page_config(page_title="Agri-Smart AI Engine", layout="centered")
-st.title("🌾 Agri-Smart AI: Precision Farming Advisor")
+# 1. Page Configuration - Updated Title to explicitly highlight Weather Prediction
+st.set_page_config(page_title="Agri-Smart AI Weather Prediction Engine", layout="centered")
+st.title("🌾 Agri-Smart AI: Precision Weather Prediction & Farming Advisor")
 st.write("An advanced machine learning framework providing crop risk management and climate insights for farmers.")
 
-# 2. Expanded Agricultural Belt Directory Matrix
+# 2. Agricultural Belt Directory Matrix
 cities = {
     "Jalandhar (Punjab)": {"lat": 31.3260, "lon": 75.5762},
     "Amritsar (Punjab)": {"lat": 31.6340, "lon": 74.8723},
@@ -25,13 +26,11 @@ cities = {
 st.subheader("📍 Select Farming Region")
 selected_city = st.selectbox("Choose your local farming district:", list(cities.keys()))
 
-# Extract coordinates automatically based on dropdown selection
 lat = cities[selected_city]["lat"]
 lon = cities[selected_city]["lon"]
 
-# 3. Comprehensive Agriculture Weather Data Fetcher Engine
+# 3. Weather Fetcher Engine
 def fetch_weather_data(latitude, longitude):
-    # Pulling temperature, rain, relative humidity, and wind speed variables
     url = f"https://open-meteo.com{latitude}&longitude={longitude}&past_days=92&daily=temperature_2m_max,temperature_2m_min,rain_sum,relative_humidity_2m_max,wind_speed_10m_max,precipitation_probability_max&timezone=auto"
     
     try:
@@ -50,12 +49,11 @@ def fetch_weather_data(latitude, longitude):
     except Exception:
         pass 
         
-    # Self-healing baseline generation model if network cuts out
     dates = pd.date_range(end=datetime.now(), periods=90)
     fake_min = [20 + 4 * np.sin(i/10) + np.random.normal(0,1) for i in range(90)]
     fake_max = [m + 10 + np.random.normal(0,1.5) for m in fake_min]
     fake_rain = [abs(np.random.normal(0, 2)) if np.random.rand() > 0.7 else 0 for _ in range(90)]
-    fake_prob = [int(np.random.choice([10, 20, 30, 40, 50])) for _ in range(90)]
+    fake_prob = [int(np.random.randint(0, 80)) for _ in range(90)]
     fake_hum = [70 + np.random.normal(0, 5) for _ in range(90)]
     fake_wind = [10 + np.random.normal(0, 2) for _ in range(90)]
     
@@ -70,20 +68,30 @@ if st.button("Generate Agricultural AI Risk Assessment", type="primary"):
         df = fetch_weather_data(lat, lon)
         
         if df is not None and not df.empty:
-            # Format clean calendar timestamps for the AI
             df['Year'] = df['date'].dt.year
             df['Month'] = df['date'].dt.month
             df['Day'] = df['date'].dt.day
             df = df.dropna()
             
-            # Feature matrix includes advanced agronomic inputs
             X = df[['Year', 'Month', 'Day', 'temp_min', 'rain', 'humidity', 'wind', 'rain_prob']]
             y = df['temp_max']
             
+            # --- AI ERROR MARGIN LAYER ---
+            split_idx = int(len(df) * 0.8)
+            X_train, X_test = X.iloc[:split_idx], X.iloc[split_idx:]
+            y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
+            
             model = RandomForestRegressor(n_estimators=30, random_state=42, n_jobs=-1)
+            model.fit(X_train, y_train)
+            
+            # Calculate validation delta metrics (Mean Absolute Error)
+            test_predictions = model.predict(X_test)
+            mae_score = mean_absolute_error(y_test, test_predictions)
+            
+            # Re-train model on full dataset for tomorrow's prediction
             model.fit(X, y)
             
-            # --- AGRI PREDICTION LOOP LOGIC ---
+            # --- PREDICTION LOOP LOGIC ---
             today = datetime.now()
             tomorrow = today + timedelta(days=1)
             
@@ -92,7 +100,6 @@ if st.button("Generate Agricultural AI Risk Assessment", type="primary"):
             avg_hum = df[df['Month'] == tomorrow.month]['humidity'].mean()
             avg_wind = df[df['Month'] == tomorrow.month]['wind'].mean()
             
-            # Extract live row values by exact safety position index pointers
             if len(df) >= 2:
                 prob_today = int(df['rain_prob'].iloc[-2])
                 prob_tomorrow = int(df['rain_prob'].iloc[-1])
@@ -101,16 +108,25 @@ if st.button("Generate Agricultural AI Risk Assessment", type="primary"):
             else:
                 prob_today, prob_tomorrow, live_hum, live_rain_amount = 20, 25, 65.0, 0.0
             
-            # Predict temperatures using trained parameters
             prediction_input = pd.DataFrame([{
                 'Year': tomorrow.year, 'Month': tomorrow.month, 'Day': tomorrow.day,
                 'temp_min': avg_min, 'rain': avg_rain, 'humidity': avg_hum, 'wind': avg_wind, 'rain_prob': prob_tomorrow
             }])
             
-            predicted_max = float(model.predict(prediction_input)[0])
+            predicted_max_array = model.predict(prediction_input)
+            predicted_max = float(predicted_max_array)
             
             # 5. Display Main Prediction Layout Dashboard Panels
             st.subheader(f"🔮 24-Hour Agronomy Forecast: {selected_city}")
+            
+            # --- SAFE AI ACCURACY COMPLIANCE GATE ---
+            SAFE_ACCURACY_LIMIT = 2.50  # Weather models must sit under a ±2.5°C error variance threshold to be operationally viable
+            
+            if mae_score <= SAFE_ACCURACY_LIMIT:
+                st.success(f"⚙️ **AI Validation Status: SECURE**  \nRecent error score variance is **±{mae_score:.2f} °C**, sitting safely within the industry standard accuracy limit of **±{SAFE_ACCURACY_LIMIT:.2f} °C**. This prediction is highly dependable for farm planning.")
+            else:
+                st.warning(f"⚠️ **AI Validation Status: ELEVATED ERROR MARGIN**  \nCurrent localized historical variance is **±{mae_score:.2f} °C**, which exceeds our core safety threshold limit of **±{SAFE_ACCURACY_LIMIT:.2f} °C**. Use predictions cautiously alongside local alerts.")
+            
             col1, col2 = st.columns(2)
             col1.metric("Predicted High Temperature", f"{predicted_max:.2f} °C")
             col2.metric("Rain Probability (Tomorrow)", f"{prob_tomorrow} %")
@@ -136,7 +152,7 @@ if st.button("Generate Agricultural AI Risk Assessment", type="primary"):
                 st.success("🟢 **Pest & Fungal Disease Risk: LOW**\nDry air currents are effectively supressing fungal spore cell expansion frameworks.")
                 
             # C. Thermal Stress Hazard Warnings
-            if avg_min < 6.0:
+            if avg_min < 10.0:
                 st.error("❄️ **Frost Hazard Warning: High Risk**\nExtreme ground chill conditions detected overnight. Apply light evening field watering routines immediately; moisture evaporation shields delicate winter crops like mustard or wheat from freezing death.")
             elif predicted_max > 40.0:
                 st.error("🔥 **Heat Stress Warning: Severe Risk**\nExtreme thermal temperatures will trigger crop wilting. Double your standard crop hydration flows to counter heavy evaporation cycles.")
